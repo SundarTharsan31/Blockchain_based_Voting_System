@@ -9,7 +9,6 @@ contract CollegeVoting {
 
     address public owner;
 
-    // Phase 5: Election administrators
     mapping(address => bool) private electionAdmins;
     address[] private adminList;
 
@@ -17,7 +16,6 @@ contract CollegeVoting {
         owner = msg.sender;
     }
 
-    // Owner / Super Admin only
     modifier onlyOwner() {
         require(
             msg.sender == owner,
@@ -26,7 +24,6 @@ contract CollegeVoting {
         _;
     }
 
-    // Owner or approved Election Admin
     modifier onlyOwnerOrAdmin() {
         require(
             msg.sender == owner ||
@@ -81,6 +78,18 @@ contract CollegeVoting {
 
 
     // ============================================================
+    // PHASE 6 - SECURITY SEVERITY
+    // ============================================================
+
+    enum SecuritySeverity {
+        LOW,
+        MEDIUM,
+        HIGH,
+        CRITICAL
+    }
+
+
+    // ============================================================
     // ELECTION STRUCT
     // ============================================================
 
@@ -119,6 +128,30 @@ contract CollegeVoting {
         CandidateStatus status;
 
         uint256 voteCount;
+    }
+
+
+    // ============================================================
+    // PHASE 6 - SECURITY INCIDENT STRUCT
+    // ============================================================
+
+    struct SecurityIncident {
+
+        uint256 id;
+
+        uint256 electionId;
+
+        SecuritySeverity severity;
+
+        bytes32 incidentType;
+
+        bytes32 descriptionHash;
+
+        bytes32 evidenceHash;
+
+        address reportedBy;
+
+        uint256 timestamp;
     }
 
 
@@ -162,31 +195,42 @@ contract CollegeVoting {
     // VOTER STORAGE
     // ============================================================
 
-    // Whether a voter is eligible for an election.
     mapping(
         uint256 => mapping(
             bytes32 => bool
         )
     ) private eligibleVoter;
 
-    // Whether a voter has already voted.
     mapping(
         uint256 => mapping(
             bytes32 => bool
         )
     ) private voterHasVoted;
 
-    // Prevent duplicate voter registration.
     mapping(
         uint256 => mapping(
             bytes32 => bool
         )
     ) private voterIdentityExists;
 
-    // Registered voter identity hashes.
     mapping(
         uint256 => bytes32[]
     ) private electionVoterIdentities;
+
+
+    // ============================================================
+    // PHASE 6 - SECURITY STORAGE
+    // ============================================================
+
+    uint256 private nextSecurityIncidentId = 1;
+
+    mapping(
+        uint256 => SecurityIncident
+    ) private securityIncidents;
+
+    mapping(
+        uint256 => uint256[]
+    ) private electionSecurityIncidentIds;
 
 
     // ============================================================
@@ -252,6 +296,21 @@ contract CollegeVoting {
 
     event AdminRemoved(
         address indexed admin
+    );
+
+
+    // ============================================================
+    // PHASE 6 - SECURITY EVENT
+    // ============================================================
+
+    event SecurityIncidentReported(
+        uint256 indexed incidentId,
+        uint256 indexed electionId,
+        SecuritySeverity severity,
+        bytes32 incidentType,
+        bytes32 descriptionHash,
+        bytes32 evidenceHash,
+        address indexed reportedBy
     );
 
 
@@ -359,13 +418,11 @@ contract CollegeVoting {
 
         electionAdmins[admin] = false;
 
-        // Remove from array using swap-and-pop
         for (
             uint256 i = 0;
             i < adminList.length;
             i++
         ) {
-
             if (adminList[i] == admin) {
 
                 adminList[i] =
@@ -449,7 +506,6 @@ contract CollegeVoting {
         onlyOwnerOrAdmin
         returns (uint256)
     {
-
         require(
             bytes(title).length > 0,
             "Title required"
@@ -506,7 +562,6 @@ contract CollegeVoting {
         external
         onlyOwnerOrAdmin
     {
-
         Election storage election =
             elections[electionId];
 
@@ -540,7 +595,6 @@ contract CollegeVoting {
         external
         onlyOwnerOrAdmin
     {
-
         Election storage election =
             elections[electionId];
 
@@ -586,7 +640,6 @@ contract CollegeVoting {
         external
         onlyOwnerOrAdmin
     {
-
         Election storage election =
             elections[electionId];
 
@@ -620,7 +673,6 @@ contract CollegeVoting {
         external
         onlyOwnerOrAdmin
     {
-
         Election storage election =
             elections[electionId];
 
@@ -660,7 +712,6 @@ contract CollegeVoting {
         external
         onlyOwnerOrAdmin
     {
-
         Election storage election =
             elections[electionId];
 
@@ -702,7 +753,6 @@ contract CollegeVoting {
         external
         onlyOwnerOrAdmin
     {
-
         Election storage election =
             elections[electionId];
 
@@ -736,7 +786,6 @@ contract CollegeVoting {
         external
         onlyOwnerOrAdmin
     {
-
         Election storage election =
             elections[electionId];
 
@@ -770,7 +819,6 @@ contract CollegeVoting {
         external
         onlyOwnerOrAdmin
     {
-
         Election storage election =
             elections[electionId];
 
@@ -797,7 +845,6 @@ contract CollegeVoting {
     // ============================================================
     // COMPROMISE ELECTION
     // ============================================================
-    // Critical security action remains owner-only in Phase 5.
 
     function compromiseElection(
         uint256 electionId
@@ -805,7 +852,6 @@ contract CollegeVoting {
         external
         onlyOwner
     {
-
         Election storage election =
             elections[electionId];
 
@@ -832,7 +878,6 @@ contract CollegeVoting {
     // ============================================================
     // INVALIDATE ELECTION
     // ============================================================
-    // Critical security action remains owner-only in Phase 5.
 
     function invalidateElection(
         uint256 electionId
@@ -840,7 +885,6 @@ contract CollegeVoting {
         external
         onlyOwner
     {
-
         Election storage election =
             elections[electionId];
 
@@ -865,6 +909,159 @@ contract CollegeVoting {
 
 
     // ============================================================
+    // PHASE 6 - REPORT SECURITY INCIDENT
+    // ============================================================
+
+    function reportSecurityIncident(
+        uint256 electionId,
+        SecuritySeverity severity,
+        bytes32 incidentType,
+        bytes32 descriptionHash,
+        bytes32 evidenceHash
+    )
+        external
+        onlyOwnerOrAdmin
+        returns (uint256)
+    {
+        require(
+            elections[electionId].id != 0,
+            "Election does not exist"
+        );
+
+        require(
+            incidentType != bytes32(0),
+            "Incident type required"
+        );
+
+        require(
+            descriptionHash != bytes32(0),
+            "Description hash required"
+        );
+
+        uint256 incidentId =
+            nextSecurityIncidentId;
+
+        securityIncidents[incidentId] =
+            SecurityIncident({
+                id: incidentId,
+                electionId: electionId,
+                severity: severity,
+                incidentType: incidentType,
+                descriptionHash: descriptionHash,
+                evidenceHash: evidenceHash,
+                reportedBy: msg.sender,
+                timestamp: block.timestamp
+            });
+
+        electionSecurityIncidentIds[
+            electionId
+        ].push(incidentId);
+
+        nextSecurityIncidentId++;
+
+        emit SecurityIncidentReported(
+            incidentId,
+            electionId,
+            severity,
+            incidentType,
+            descriptionHash,
+            evidenceHash,
+            msg.sender
+        );
+
+        return incidentId;
+    }
+
+
+    // ============================================================
+    // PHASE 6 - GET SECURITY INCIDENT
+    // ============================================================
+
+    function getSecurityIncident(
+        uint256 incidentId
+    )
+        external
+        view
+        returns (SecurityIncident memory)
+    {
+        require(
+            securityIncidents[incidentId].id != 0,
+            "Incident does not exist"
+        );
+
+        return securityIncidents[
+            incidentId
+        ];
+    }
+
+
+    // ============================================================
+    // PHASE 6 - GET INCIDENT COUNT
+    // ============================================================
+
+    function getSecurityIncidentCount()
+        external
+        view
+        returns (uint256)
+    {
+        return nextSecurityIncidentId - 1;
+    }
+
+
+    // ============================================================
+    // PHASE 6 - GET ELECTION INCIDENT COUNT
+    // ============================================================
+
+    function getElectionSecurityIncidentCount(
+        uint256 electionId
+    )
+        external
+        view
+        returns (uint256)
+    {
+        require(
+            elections[electionId].id != 0,
+            "Election does not exist"
+        );
+
+        return electionSecurityIncidentIds[
+            electionId
+        ].length;
+    }
+
+
+    // ============================================================
+    // PHASE 6 - GET ELECTION INCIDENT ID
+    // ============================================================
+
+    function getElectionSecurityIncidentId(
+        uint256 electionId,
+        uint256 index
+    )
+        external
+        view
+        returns (uint256)
+    {
+        require(
+            elections[electionId].id != 0,
+            "Election does not exist"
+        );
+
+        require(
+            index <
+                electionSecurityIncidentIds[
+                    electionId
+                ].length,
+            "Incident index out of bounds"
+        );
+
+        return electionSecurityIncidentIds[
+            electionId
+        ][index];
+    }
+
+
+    // ============================================================
     // ADD CANDIDATE
     // ============================================================
 
@@ -877,7 +1074,6 @@ contract CollegeVoting {
         onlyOwnerOrAdmin
         returns (uint256)
     {
-
         Election storage election =
             elections[electionId];
 
@@ -955,7 +1151,6 @@ contract CollegeVoting {
         external
         onlyOwnerOrAdmin
     {
-
         Election storage election =
             elections[electionId];
 
@@ -1010,7 +1205,6 @@ contract CollegeVoting {
         external
         onlyOwnerOrAdmin
     {
-
         Election storage election =
             elections[electionId];
 
@@ -1064,7 +1258,6 @@ contract CollegeVoting {
         external
         onlyOwnerOrAdmin
     {
-
         Election storage election =
             elections[electionId];
 
@@ -1118,7 +1311,6 @@ contract CollegeVoting {
         external
         onlyOwnerOrAdmin
     {
-
         Election storage election =
             elections[electionId];
 
@@ -1179,7 +1371,6 @@ contract CollegeVoting {
         external
         onlyOwnerOrAdmin
     {
-
         Election storage election =
             elections[electionId];
 
@@ -1235,7 +1426,6 @@ contract CollegeVoting {
         view
         returns (bool)
     {
-
         require(
             elections[electionId].id != 0,
             "Election does not exist"
@@ -1259,7 +1449,6 @@ contract CollegeVoting {
         view
         returns (bool)
     {
-
         require(
             elections[electionId].id != 0,
             "Election does not exist"
@@ -1282,7 +1471,6 @@ contract CollegeVoting {
         view
         returns (uint256)
     {
-
         require(
             elections[electionId].id != 0,
             "Election does not exist"
@@ -1297,7 +1485,8 @@ contract CollegeVoting {
     // ============================================================
     // CAST VOTE
     // ============================================================
-    // Kept owner-only for Phase 5.
+
+    // Kept owner-only in Phase 6.
     // Actual voter wallet authorization comes later.
 
     function castVote(
@@ -1308,7 +1497,6 @@ contract CollegeVoting {
         external
         onlyOwner
     {
-
         Election storage election =
             elections[electionId];
 
@@ -1365,15 +1553,12 @@ contract CollegeVoting {
             "Candidate not active"
         );
 
-        // Mark voter as having voted.
         voterHasVoted[
             electionId
         ][voterIdentityHash] = true;
 
-        // Increase candidate vote count.
         candidate.voteCount++;
 
-        // Increase total election vote count.
         election.totalVotes++;
 
         emit VoteCast(
@@ -1395,7 +1580,6 @@ contract CollegeVoting {
         view
         returns (Election memory)
     {
-
         require(
             electionId > 0 &&
             electionId < nextElectionId,
@@ -1433,7 +1617,6 @@ contract CollegeVoting {
         view
         returns (Candidate memory)
     {
-
         require(
             elections[electionId].id != 0,
             "Election does not exist"
@@ -1463,7 +1646,6 @@ contract CollegeVoting {
         view
         returns (uint256[] memory)
     {
-
         require(
             elections[electionId].id != 0,
             "Election does not exist"
@@ -1486,7 +1668,6 @@ contract CollegeVoting {
         view
         returns (uint256)
     {
-
         require(
             elections[electionId].id != 0,
             "Election does not exist"
