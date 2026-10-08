@@ -4,18 +4,33 @@ pragma solidity ^0.8.24;
 contract CollegeVoting {
 
     // ============================================================
-    // OWNER
+    // OWNER + ADMIN GOVERNANCE
     // ============================================================
 
     address public owner;
+
+    // Phase 5: Election administrators
+    mapping(address => bool) private electionAdmins;
+    address[] private adminList;
 
     constructor() {
         owner = msg.sender;
     }
 
+    // Owner / Super Admin only
     modifier onlyOwner() {
         require(
             msg.sender == owner,
+            "Only owner"
+        );
+        _;
+    }
+
+    // Owner or approved Election Admin
+    modifier onlyOwnerOrAdmin() {
+        require(
+            msg.sender == owner ||
+            electionAdmins[msg.sender],
             "Only owner"
         );
         _;
@@ -154,7 +169,6 @@ contract CollegeVoting {
         )
     ) private eligibleVoter;
 
-
     // Whether a voter has already voted.
     mapping(
         uint256 => mapping(
@@ -162,14 +176,12 @@ contract CollegeVoting {
         )
     ) private voterHasVoted;
 
-
     // Prevent duplicate voter registration.
     mapping(
         uint256 => mapping(
             bytes32 => bool
         )
     ) private voterIdentityExists;
-
 
     // Registered voter identity hashes.
     mapping(
@@ -231,6 +243,19 @@ contract CollegeVoting {
 
 
     // ============================================================
+    // PHASE 5 - ADMIN EVENTS
+    // ============================================================
+
+    event AdminAdded(
+        address indexed admin
+    );
+
+    event AdminRemoved(
+        address indexed admin
+    );
+
+
+    // ============================================================
     // CANDIDATE EVENTS
     // ============================================================
 
@@ -285,6 +310,131 @@ contract CollegeVoting {
 
 
     // ============================================================
+    // PHASE 5 - ADD ADMIN
+    // ============================================================
+
+    function addAdmin(
+        address admin
+    )
+        external
+        onlyOwner
+    {
+        require(
+            admin != address(0),
+            "Invalid admin address"
+        );
+
+        require(
+            admin != owner,
+            "Owner is already admin"
+        );
+
+        require(
+            !electionAdmins[admin],
+            "Admin already exists"
+        );
+
+        electionAdmins[admin] = true;
+
+        adminList.push(admin);
+
+        emit AdminAdded(admin);
+    }
+
+
+    // ============================================================
+    // PHASE 5 - REMOVE ADMIN
+    // ============================================================
+
+    function removeAdmin(
+        address admin
+    )
+        external
+        onlyOwner
+    {
+        require(
+            electionAdmins[admin],
+            "Admin does not exist"
+        );
+
+        electionAdmins[admin] = false;
+
+        // Remove from array using swap-and-pop
+        for (
+            uint256 i = 0;
+            i < adminList.length;
+            i++
+        ) {
+
+            if (adminList[i] == admin) {
+
+                adminList[i] =
+                    adminList[
+                        adminList.length - 1
+                    ];
+
+                adminList.pop();
+
+                break;
+            }
+        }
+
+        emit AdminRemoved(admin);
+    }
+
+
+    // ============================================================
+    // PHASE 5 - CHECK ADMIN
+    // ============================================================
+
+    function isAdmin(
+        address account
+    )
+        external
+        view
+        returns (bool)
+    {
+        return (
+            account == owner ||
+            electionAdmins[account]
+        );
+    }
+
+
+    // ============================================================
+    // PHASE 5 - GET ADMIN COUNT
+    // ============================================================
+
+    function getAdminCount()
+        external
+        view
+        returns (uint256)
+    {
+        return adminList.length;
+    }
+
+
+    // ============================================================
+    // PHASE 5 - GET ADMIN BY INDEX
+    // ============================================================
+
+    function getAdminAt(
+        uint256 index
+    )
+        external
+        view
+        returns (address)
+    {
+        require(
+            index < adminList.length,
+            "Admin index out of bounds"
+        );
+
+        return adminList[index];
+    }
+
+
+    // ============================================================
     // CREATE ELECTION
     // ============================================================
 
@@ -296,7 +446,7 @@ contract CollegeVoting {
         uint256 eligibleVoterCount
     )
         external
-        onlyOwner
+        onlyOwnerOrAdmin
         returns (uint256)
     {
 
@@ -354,7 +504,7 @@ contract CollegeVoting {
         uint256 electionId
     )
         external
-        onlyOwner
+        onlyOwnerOrAdmin
     {
 
         Election storage election =
@@ -388,7 +538,7 @@ contract CollegeVoting {
         uint256 electionId
     )
         external
-        onlyOwner
+        onlyOwnerOrAdmin
     {
 
         Election storage election =
@@ -434,7 +584,7 @@ contract CollegeVoting {
         uint256 electionId
     )
         external
-        onlyOwner
+        onlyOwnerOrAdmin
     {
 
         Election storage election =
@@ -468,7 +618,7 @@ contract CollegeVoting {
         uint256 electionId
     )
         external
-        onlyOwner
+        onlyOwnerOrAdmin
     {
 
         Election storage election =
@@ -508,7 +658,7 @@ contract CollegeVoting {
         uint256 electionId
     )
         external
-        onlyOwner
+        onlyOwnerOrAdmin
     {
 
         Election storage election =
@@ -550,7 +700,7 @@ contract CollegeVoting {
         uint256 electionId
     )
         external
-        onlyOwner
+        onlyOwnerOrAdmin
     {
 
         Election storage election =
@@ -584,7 +734,7 @@ contract CollegeVoting {
         uint256 electionId
     )
         external
-        onlyOwner
+        onlyOwnerOrAdmin
     {
 
         Election storage election =
@@ -618,7 +768,7 @@ contract CollegeVoting {
         uint256 electionId
     )
         external
-        onlyOwner
+        onlyOwnerOrAdmin
     {
 
         Election storage election =
@@ -647,6 +797,7 @@ contract CollegeVoting {
     // ============================================================
     // COMPROMISE ELECTION
     // ============================================================
+    // Critical security action remains owner-only in Phase 5.
 
     function compromiseElection(
         uint256 electionId
@@ -681,6 +832,7 @@ contract CollegeVoting {
     // ============================================================
     // INVALIDATE ELECTION
     // ============================================================
+    // Critical security action remains owner-only in Phase 5.
 
     function invalidateElection(
         uint256 electionId
@@ -722,7 +874,7 @@ contract CollegeVoting {
         bytes32 metadataHash
     )
         external
-        onlyOwner
+        onlyOwnerOrAdmin
         returns (uint256)
     {
 
@@ -757,7 +909,9 @@ contract CollegeVoting {
         uint256 candidateId =
             nextCandidateId[electionId];
 
-        candidates[electionId][candidateId] =
+        candidates[
+            electionId
+        ][candidateId] =
             Candidate({
                 id: candidateId,
                 identityHash: identityHash,
@@ -766,14 +920,17 @@ contract CollegeVoting {
                 voteCount: 0
             });
 
-        electionCandidateIds[electionId]
-            .push(candidateId);
+        electionCandidateIds[
+            electionId
+        ].push(candidateId);
 
         candidateIdentityExists[
             electionId
         ][identityHash] = true;
 
-        nextCandidateId[electionId]++;
+        nextCandidateId[
+            electionId
+        ]++;
 
         emit CandidateAdded(
             electionId,
@@ -796,7 +953,7 @@ contract CollegeVoting {
         bytes32 metadataHash
     )
         external
-        onlyOwner
+        onlyOwnerOrAdmin
     {
 
         Election storage election =
@@ -851,7 +1008,7 @@ contract CollegeVoting {
         uint256 candidateId
     )
         external
-        onlyOwner
+        onlyOwnerOrAdmin
     {
 
         Election storage election =
@@ -905,7 +1062,7 @@ contract CollegeVoting {
         uint256 candidateId
     )
         external
-        onlyOwner
+        onlyOwnerOrAdmin
     {
 
         Election storage election =
@@ -959,7 +1116,7 @@ contract CollegeVoting {
         bytes32 identityHash
     )
         external
-        onlyOwner
+        onlyOwnerOrAdmin
     {
 
         Election storage election =
@@ -1020,7 +1177,7 @@ contract CollegeVoting {
         bytes32 identityHash
     )
         external
-        onlyOwner
+        onlyOwnerOrAdmin
     {
 
         Election storage election =
@@ -1140,6 +1297,8 @@ contract CollegeVoting {
     // ============================================================
     // CAST VOTE
     // ============================================================
+    // Kept owner-only for Phase 5.
+    // Actual voter wallet authorization comes later.
 
     function castVote(
         uint256 electionId,
@@ -1243,7 +1402,9 @@ contract CollegeVoting {
             "Election does not exist"
         );
 
-        return elections[electionId];
+        return elections[
+            electionId
+        ];
     }
 
 
