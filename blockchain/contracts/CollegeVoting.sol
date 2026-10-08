@@ -126,18 +126,15 @@ contract CollegeVoting {
         uint256 => uint256
     ) private nextCandidateId;
 
-
     mapping(
         uint256 => mapping(
             uint256 => Candidate
         )
     ) private candidates;
 
-
     mapping(
         uint256 => uint256[]
     ) private electionCandidateIds;
-
 
     // Prevent duplicate candidate identity
     mapping(
@@ -145,6 +142,57 @@ contract CollegeVoting {
             bytes32 => bool
         )
     ) private candidateIdentityExists;
+
+
+    // ============================================================
+    // VOTER STORAGE
+    // ============================================================
+
+    // Stores whether a voter is eligible for a particular election.
+    //
+    // electionId
+    //      ↓
+    // identityHash
+    //      ↓
+    // true / false
+    //
+    mapping(
+        uint256 => mapping(
+            bytes32 => bool
+        )
+    ) private eligibleVoter;
+
+
+    // Stores whether a voter has already voted.
+    //
+    // This will be used by Phase 4 when castVote()
+    // is implemented.
+    //
+    mapping(
+        uint256 => mapping(
+            bytes32 => bool
+        )
+    ) private voterHasVoted;
+
+
+    // Prevent duplicate voter registration.
+    //
+    // This remains true even if eligibility is later revoked.
+    //
+    mapping(
+        uint256 => mapping(
+            bytes32 => bool
+        )
+    ) private voterIdentityExists;
+
+
+    // Stores the identity hashes registered for each election.
+    //
+    // Personal information is NOT stored here.
+    //
+    mapping(
+        uint256 => bytes32[]
+    ) private electionVoterIdentities;
 
 
     // ============================================================
@@ -159,51 +207,41 @@ contract CollegeVoting {
         uint256 endTime
     );
 
-
     event ElectionScheduled(
         uint256 indexed electionId
     );
-
 
     event ElectionStarted(
         uint256 indexed electionId
     );
 
-
     event ElectionPaused(
         uint256 indexed electionId
     );
-
 
     event ElectionResumed(
         uint256 indexed electionId
     );
 
-
     event ElectionEnded(
         uint256 indexed electionId
     );
-
 
     event ElectionFinalizing(
         uint256 indexed electionId
     );
 
-
     event ElectionPublished(
         uint256 indexed electionId
     );
-
 
     event ElectionCancelled(
         uint256 indexed electionId
     );
 
-
     event ElectionCompromised(
         uint256 indexed electionId
     );
-
 
     event ElectionInvalidated(
         uint256 indexed electionId
@@ -221,23 +259,35 @@ contract CollegeVoting {
         bytes32 metadataHash
     );
 
-
     event CandidateUpdated(
         uint256 indexed electionId,
         uint256 indexed candidateId,
         bytes32 metadataHash
     );
 
-
     event CandidateRemoved(
         uint256 indexed electionId,
         uint256 indexed candidateId
     );
 
-
     event CandidateWithdrawn(
         uint256 indexed electionId,
         uint256 indexed candidateId
+    );
+
+
+    // ============================================================
+    // VOTER EVENTS
+    // ============================================================
+
+    event VoterRegistered(
+        uint256 indexed electionId,
+        bytes32 indexed identityHash
+    );
+
+    event VoterEligibilityRevoked(
+        uint256 indexed electionId,
+        bytes32 indexed identityHash
     );
 
 
@@ -262,22 +312,18 @@ contract CollegeVoting {
             "Title required"
         );
 
-
         require(
             endTime > startTime,
             "Invalid election time"
         );
-
 
         require(
             startTime > block.timestamp,
             "Start time must be future"
         );
 
-
         uint256 electionId =
             nextElectionId;
-
 
         elections[electionId] =
             Election({
@@ -291,13 +337,10 @@ contract CollegeVoting {
                 totalVotes: 0
             });
 
-
         nextElectionId++;
 
-
-        // First candidate ID starts from 1
+        // First candidate ID starts from 1.
         nextCandidateId[electionId] = 1;
-
 
         emit ElectionCreated(
             electionId,
@@ -306,7 +349,6 @@ contract CollegeVoting {
             startTime,
             endTime
         );
-
 
         return electionId;
     }
@@ -326,12 +368,10 @@ contract CollegeVoting {
         Election storage election =
             elections[electionId];
 
-
         require(
             election.id != 0,
             "Election does not exist"
         );
-
 
         require(
             election.status ==
@@ -339,10 +379,8 @@ contract CollegeVoting {
             "Election not in draft"
         );
 
-
         election.status =
             ElectionStatus.SCHEDULED;
-
 
         emit ElectionScheduled(
             electionId
@@ -364,12 +402,10 @@ contract CollegeVoting {
         Election storage election =
             elections[electionId];
 
-
         require(
             election.id != 0,
             "Election does not exist"
         );
-
 
         require(
             election.status ==
@@ -377,13 +413,11 @@ contract CollegeVoting {
             "Election not scheduled"
         );
 
-
         require(
             block.timestamp >=
                 election.startTime,
             "Election has not started"
         );
-
 
         require(
             block.timestamp <
@@ -391,10 +425,8 @@ contract CollegeVoting {
             "Election already ended"
         );
 
-
         election.status =
             ElectionStatus.ACTIVE;
-
 
         emit ElectionStarted(
             electionId
@@ -416,12 +448,10 @@ contract CollegeVoting {
         Election storage election =
             elections[electionId];
 
-
         require(
             election.id != 0,
             "Election does not exist"
         );
-
 
         require(
             election.status ==
@@ -429,10 +459,8 @@ contract CollegeVoting {
             "Election not active"
         );
 
-
         election.status =
             ElectionStatus.PAUSED;
-
 
         emit ElectionPaused(
             electionId
@@ -454,12 +482,10 @@ contract CollegeVoting {
         Election storage election =
             elections[electionId];
 
-
         require(
             election.id != 0,
             "Election does not exist"
         );
-
 
         require(
             election.status ==
@@ -467,17 +493,14 @@ contract CollegeVoting {
             "Election not paused"
         );
 
-
         require(
             block.timestamp <
                 election.endTime,
             "Election already ended"
         );
 
-
         election.status =
             ElectionStatus.ACTIVE;
-
 
         emit ElectionResumed(
             electionId
@@ -499,12 +522,10 @@ contract CollegeVoting {
         Election storage election =
             elections[electionId];
 
-
         require(
             election.id != 0,
             "Election does not exist"
         );
-
 
         require(
             election.status ==
@@ -514,17 +535,14 @@ contract CollegeVoting {
             "Election not active"
         );
 
-
         require(
             block.timestamp >=
                 election.endTime,
             "Election still running"
         );
 
-
         election.status =
             ElectionStatus.ENDED;
-
 
         emit ElectionEnded(
             electionId
@@ -546,12 +564,10 @@ contract CollegeVoting {
         Election storage election =
             elections[electionId];
 
-
         require(
             election.id != 0,
             "Election does not exist"
         );
-
 
         require(
             election.status ==
@@ -559,10 +575,8 @@ contract CollegeVoting {
             "Election not ended"
         );
 
-
         election.status =
             ElectionStatus.FINALIZING;
-
 
         emit ElectionFinalizing(
             electionId
@@ -584,12 +598,10 @@ contract CollegeVoting {
         Election storage election =
             elections[electionId];
 
-
         require(
             election.id != 0,
             "Election does not exist"
         );
-
 
         require(
             election.status ==
@@ -597,10 +609,8 @@ contract CollegeVoting {
             "Election not finalizing"
         );
 
-
         election.status =
             ElectionStatus.PUBLISHED;
-
 
         emit ElectionPublished(
             electionId
@@ -622,12 +632,10 @@ contract CollegeVoting {
         Election storage election =
             elections[electionId];
 
-
         require(
             election.id != 0,
             "Election does not exist"
         );
-
 
         require(
             election.status ==
@@ -635,10 +643,8 @@ contract CollegeVoting {
             "Election not active"
         );
 
-
         election.status =
             ElectionStatus.CANCELLED;
-
 
         emit ElectionCancelled(
             electionId
@@ -660,12 +666,10 @@ contract CollegeVoting {
         Election storage election =
             elections[electionId];
 
-
         require(
             election.id != 0,
             "Election does not exist"
         );
-
 
         require(
             election.status ==
@@ -673,10 +677,8 @@ contract CollegeVoting {
             "Election not active"
         );
 
-
         election.status =
             ElectionStatus.COMPROMISED;
-
 
         emit ElectionCompromised(
             electionId
@@ -698,12 +700,10 @@ contract CollegeVoting {
         Election storage election =
             elections[electionId];
 
-
         require(
             election.id != 0,
             "Election does not exist"
         );
-
 
         require(
             election.status ==
@@ -711,10 +711,8 @@ contract CollegeVoting {
             "Election not compromised"
         );
 
-
         election.status =
             ElectionStatus.INVALIDATED;
-
 
         emit ElectionInvalidated(
             electionId
@@ -739,12 +737,10 @@ contract CollegeVoting {
         Election storage election =
             elections[electionId];
 
-
         require(
             election.id != 0,
             "Election does not exist"
         );
-
 
         require(
             election.status ==
@@ -754,12 +750,10 @@ contract CollegeVoting {
             "Candidate list locked"
         );
 
-
         require(
             identityHash != bytes32(0),
             "Identity hash required"
         );
-
 
         require(
             !candidateIdentityExists[
@@ -768,10 +762,8 @@ contract CollegeVoting {
             "Candidate already exists"
         );
 
-
         uint256 candidateId =
             nextCandidateId[electionId];
-
 
         candidates[electionId][candidateId] =
             Candidate({
@@ -782,18 +774,14 @@ contract CollegeVoting {
                 voteCount: 0
             });
 
-
         electionCandidateIds[electionId]
             .push(candidateId);
-
 
         candidateIdentityExists[
             electionId
         ][identityHash] = true;
 
-
         nextCandidateId[electionId]++;
-
 
         emit CandidateAdded(
             electionId,
@@ -801,7 +789,6 @@ contract CollegeVoting {
             identityHash,
             metadataHash
         );
-
 
         return candidateId;
     }
@@ -823,12 +810,10 @@ contract CollegeVoting {
         Election storage election =
             elections[electionId];
 
-
         require(
             election.id != 0,
             "Election does not exist"
         );
-
 
         require(
             election.status ==
@@ -838,18 +823,15 @@ contract CollegeVoting {
             "Candidate list locked"
         );
 
-
         Candidate storage candidate =
             candidates[
                 electionId
             ][candidateId];
 
-
         require(
             candidate.id != 0,
             "Candidate does not exist"
         );
-
 
         require(
             candidate.status ==
@@ -857,10 +839,8 @@ contract CollegeVoting {
             "Candidate not active"
         );
 
-
         candidate.metadataHash =
             metadataHash;
-
 
         emit CandidateUpdated(
             electionId,
@@ -885,12 +865,10 @@ contract CollegeVoting {
         Election storage election =
             elections[electionId];
 
-
         require(
             election.id != 0,
             "Election does not exist"
         );
-
 
         require(
             election.status ==
@@ -900,18 +878,15 @@ contract CollegeVoting {
             "Candidate list locked"
         );
 
-
         Candidate storage candidate =
             candidates[
                 electionId
             ][candidateId];
 
-
         require(
             candidate.id != 0,
             "Candidate does not exist"
         );
-
 
         require(
             candidate.status ==
@@ -919,10 +894,8 @@ contract CollegeVoting {
             "Candidate not active"
         );
 
-
         candidate.status =
             CandidateStatus.REMOVED;
-
 
         emit CandidateRemoved(
             electionId,
@@ -946,12 +919,10 @@ contract CollegeVoting {
         Election storage election =
             elections[electionId];
 
-
         require(
             election.id != 0,
             "Election does not exist"
         );
-
 
         require(
             election.status ==
@@ -961,18 +932,15 @@ contract CollegeVoting {
             "Election not running"
         );
 
-
         Candidate storage candidate =
             candidates[
                 electionId
             ][candidateId];
 
-
         require(
             candidate.id != 0,
             "Candidate does not exist"
         );
-
 
         require(
             candidate.status ==
@@ -980,15 +948,206 @@ contract CollegeVoting {
             "Candidate not active"
         );
 
-
         candidate.status =
             CandidateStatus.WITHDRAWN;
-
 
         emit CandidateWithdrawn(
             electionId,
             candidateId
         );
+    }
+
+
+    // ============================================================
+    // PHASE 3
+    // VOTER IDENTITY & ELIGIBILITY
+    // ============================================================
+
+
+    // ============================================================
+    // REGISTER VOTER
+    // ============================================================
+
+    function registerVoter(
+        uint256 electionId,
+        bytes32 identityHash
+    )
+        external
+        onlyOwner
+    {
+
+        Election storage election =
+            elections[electionId];
+
+        require(
+            election.id != 0,
+            "Election does not exist"
+        );
+
+        require(
+            election.status ==
+                ElectionStatus.DRAFT ||
+            election.status ==
+                ElectionStatus.SCHEDULED,
+            "Voter registration locked"
+        );
+
+        require(
+            identityHash != bytes32(0),
+            "Identity hash required"
+        );
+
+        require(
+            !voterIdentityExists[
+                electionId
+            ][identityHash],
+            "Voter already registered"
+        );
+
+        eligibleVoter[
+            electionId
+        ][identityHash] = true;
+
+        voterIdentityExists[
+            electionId
+        ][identityHash] = true;
+
+        electionVoterIdentities[
+            electionId
+        ].push(identityHash);
+
+        election.eligibleVoterCount++;
+
+        emit VoterRegistered(
+            electionId,
+            identityHash
+        );
+    }
+
+
+    // ============================================================
+    // REVOKE VOTER ELIGIBILITY
+    // ============================================================
+
+    function revokeVoterEligibility(
+        uint256 electionId,
+        bytes32 identityHash
+    )
+        external
+        onlyOwner
+    {
+
+        Election storage election =
+            elections[electionId];
+
+        require(
+            election.id != 0,
+            "Election does not exist"
+        );
+
+        require(
+            election.status ==
+                ElectionStatus.DRAFT ||
+            election.status ==
+                ElectionStatus.SCHEDULED,
+            "Voter registration locked"
+        );
+
+        require(
+            voterIdentityExists[
+                electionId
+            ][identityHash],
+            "Voter not registered"
+        );
+
+        require(
+            eligibleVoter[
+                electionId
+            ][identityHash],
+            "Voter already ineligible"
+        );
+
+        eligibleVoter[
+            electionId
+        ][identityHash] = false;
+
+        election.eligibleVoterCount--;
+
+        emit VoterEligibilityRevoked(
+            electionId,
+            identityHash
+        );
+    }
+
+
+    // ============================================================
+    // CHECK VOTER ELIGIBILITY
+    // ============================================================
+
+    function isEligibleVoter(
+        uint256 electionId,
+        bytes32 identityHash
+    )
+        external
+        view
+        returns (bool)
+    {
+
+        require(
+            elections[electionId].id != 0,
+            "Election does not exist"
+        );
+
+        return eligibleVoter[
+            electionId
+        ][identityHash];
+    }
+
+
+    // ============================================================
+    // CHECK WHETHER VOTER HAS VOTED
+    // ============================================================
+
+    function hasVoted(
+        uint256 electionId,
+        bytes32 identityHash
+    )
+        external
+        view
+        returns (bool)
+    {
+
+        require(
+            elections[electionId].id != 0,
+            "Election does not exist"
+        );
+
+        return voterHasVoted[
+            electionId
+        ][identityHash];
+    }
+
+
+    // ============================================================
+    // GET REGISTERED VOTER COUNT
+    // ============================================================
+
+    function getVoterCount(
+        uint256 electionId
+    )
+        external
+        view
+        returns (uint256)
+    {
+
+        require(
+            elections[electionId].id != 0,
+            "Election does not exist"
+        );
+
+        return electionVoterIdentities[
+            electionId
+        ].length;
     }
 
 
@@ -1009,7 +1168,6 @@ contract CollegeVoting {
             electionId < nextElectionId,
             "Election does not exist"
         );
-
 
         return elections[electionId];
     }
@@ -1046,14 +1204,12 @@ contract CollegeVoting {
             "Election does not exist"
         );
 
-
         require(
             candidates[
                 electionId
             ][candidateId].id != 0,
             "Candidate does not exist"
         );
-
 
         return candidates[
             electionId
@@ -1078,7 +1234,6 @@ contract CollegeVoting {
             "Election does not exist"
         );
 
-
         return electionCandidateIds[
             electionId
         ];
@@ -1101,7 +1256,6 @@ contract CollegeVoting {
             elections[electionId].id != 0,
             "Election does not exist"
         );
-
 
         return electionCandidateIds[
             electionId
