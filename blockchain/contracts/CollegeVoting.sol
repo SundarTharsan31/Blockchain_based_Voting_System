@@ -136,7 +136,6 @@ contract CollegeVoting {
         uint256 => uint256[]
     ) private electionCandidateIds;
 
-    // Prevent duplicate candidate identity
     mapping(
         uint256 => mapping(
             bytes32 => bool
@@ -148,14 +147,7 @@ contract CollegeVoting {
     // VOTER STORAGE
     // ============================================================
 
-    // Stores whether a voter is eligible for a particular election.
-    //
-    // electionId
-    //      ↓
-    // identityHash
-    //      ↓
-    // true / false
-    //
+    // Whether a voter is eligible for an election.
     mapping(
         uint256 => mapping(
             bytes32 => bool
@@ -163,11 +155,7 @@ contract CollegeVoting {
     ) private eligibleVoter;
 
 
-    // Stores whether a voter has already voted.
-    //
-    // This will be used by Phase 4 when castVote()
-    // is implemented.
-    //
+    // Whether a voter has already voted.
     mapping(
         uint256 => mapping(
             bytes32 => bool
@@ -176,9 +164,6 @@ contract CollegeVoting {
 
 
     // Prevent duplicate voter registration.
-    //
-    // This remains true even if eligibility is later revoked.
-    //
     mapping(
         uint256 => mapping(
             bytes32 => bool
@@ -186,10 +171,7 @@ contract CollegeVoting {
     ) private voterIdentityExists;
 
 
-    // Stores the identity hashes registered for each election.
-    //
-    // Personal information is NOT stored here.
-    //
+    // Registered voter identity hashes.
     mapping(
         uint256 => bytes32[]
     ) private electionVoterIdentities;
@@ -292,7 +274,18 @@ contract CollegeVoting {
 
 
     // ============================================================
-    // ELECTION CREATION
+    // VOTING EVENT
+    // ============================================================
+
+    event VoteCast(
+        uint256 indexed electionId,
+        bytes32 indexed voterIdentityHash,
+        uint256 indexed candidateId
+    );
+
+
+    // ============================================================
+    // CREATE ELECTION
     // ============================================================
 
     function createElection(
@@ -339,7 +332,6 @@ contract CollegeVoting {
 
         nextElectionId++;
 
-        // First candidate ID starts from 1.
         nextCandidateId[electionId] = 1;
 
         emit ElectionCreated(
@@ -851,7 +843,7 @@ contract CollegeVoting {
 
 
     // ============================================================
-    // REMOVE CANDIDATE BEFORE ELECTION START
+    // REMOVE CANDIDATE
     // ============================================================
 
     function removeCandidate(
@@ -905,7 +897,7 @@ contract CollegeVoting {
 
 
     // ============================================================
-    // WITHDRAW CANDIDATE AFTER ELECTION START
+    // WITHDRAW CANDIDATE
     // ============================================================
 
     function withdrawCandidate(
@@ -956,12 +948,6 @@ contract CollegeVoting {
             candidateId
         );
     }
-
-
-    // ============================================================
-    // PHASE 3
-    // VOTER IDENTITY & ELIGIBILITY
-    // ============================================================
 
 
     // ============================================================
@@ -1148,6 +1134,94 @@ contract CollegeVoting {
         return electionVoterIdentities[
             electionId
         ].length;
+    }
+
+
+    // ============================================================
+    // CAST VOTE
+    // ============================================================
+
+    function castVote(
+        uint256 electionId,
+        bytes32 voterIdentityHash,
+        uint256 candidateId
+    )
+        external
+        onlyOwner
+    {
+
+        Election storage election =
+            elections[electionId];
+
+        require(
+            election.id != 0,
+            "Election does not exist"
+        );
+
+        require(
+            election.status ==
+                ElectionStatus.ACTIVE,
+            "Election not active"
+        );
+
+        require(
+            block.timestamp >=
+                election.startTime,
+            "Election has not started"
+        );
+
+        require(
+            block.timestamp <
+                election.endTime,
+            "Election has ended"
+        );
+
+        require(
+            eligibleVoter[
+                electionId
+            ][voterIdentityHash],
+            "Voter not eligible"
+        );
+
+        require(
+            !voterHasVoted[
+                electionId
+            ][voterIdentityHash],
+            "Voter has already voted"
+        );
+
+        Candidate storage candidate =
+            candidates[
+                electionId
+            ][candidateId];
+
+        require(
+            candidate.id != 0,
+            "Candidate does not exist"
+        );
+
+        require(
+            candidate.status ==
+                CandidateStatus.ACTIVE,
+            "Candidate not active"
+        );
+
+        // Mark voter as having voted.
+        voterHasVoted[
+            electionId
+        ][voterIdentityHash] = true;
+
+        // Increase candidate vote count.
+        candidate.voteCount++;
+
+        // Increase total election vote count.
+        election.totalVotes++;
+
+        emit VoteCast(
+            electionId,
+            voterIdentityHash,
+            candidateId
+        );
     }
 
 
