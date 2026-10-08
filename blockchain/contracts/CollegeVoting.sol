@@ -33,7 +33,6 @@ contract CollegeVoting {
         _;
     }
 
-
     // ============================================================
     // ELECTION STATUS
     // ============================================================
@@ -51,7 +50,6 @@ contract CollegeVoting {
         INVALIDATED
     }
 
-
     // ============================================================
     // ELECTION TYPE
     // ============================================================
@@ -65,7 +63,6 @@ contract CollegeVoting {
         CUSTOM
     }
 
-
     // ============================================================
     // CANDIDATE STATUS
     // ============================================================
@@ -76,9 +73,8 @@ contract CollegeVoting {
         WITHDRAWN
     }
 
-
     // ============================================================
-    // PHASE 6 - SECURITY SEVERITY
+    // SECURITY SEVERITY
     // ============================================================
 
     enum SecuritySeverity {
@@ -88,72 +84,65 @@ contract CollegeVoting {
         CRITICAL
     }
 
-
     // ============================================================
     // ELECTION STRUCT
     // ============================================================
 
     struct Election {
-
         uint256 id;
-
         string title;
-
         ElectionType electionType;
-
         ElectionStatus status;
-
         uint256 startTime;
-
         uint256 endTime;
-
         uint256 eligibleVoterCount;
-
         uint256 totalVotes;
     }
-
 
     // ============================================================
     // CANDIDATE STRUCT
     // ============================================================
 
     struct Candidate {
-
         uint256 id;
-
         bytes32 identityHash;
-
         bytes32 metadataHash;
-
         CandidateStatus status;
-
         uint256 voteCount;
     }
 
-
     // ============================================================
-    // PHASE 6 - SECURITY INCIDENT STRUCT
+    // SECURITY INCIDENT STRUCT
     // ============================================================
 
     struct SecurityIncident {
-
         uint256 id;
-
         uint256 electionId;
-
         SecuritySeverity severity;
-
         bytes32 incidentType;
-
         bytes32 descriptionHash;
-
         bytes32 evidenceHash;
-
         address reportedBy;
-
         uint256 timestamp;
     }
 
+    // ============================================================
+    // PHASE 7 - ELECTION RESULT STRUCT
+    // ============================================================
+
+    struct ElectionResult {
+        uint256 electionId;
+        uint256 totalVotes;
+        uint256 eligibleVoters;
+        uint256 turnoutBasisPoints;
+        uint256 winnerCandidateId;
+        uint256 winningVoteCount;
+        bool isTie;
+        bool hasVotes;
+        bytes32 resultHash;
+        uint256 finalizedAt;
+        address finalizedBy;
+    }
 
     // ============================================================
     // ELECTION STORAGE
@@ -164,7 +153,6 @@ contract CollegeVoting {
     mapping(
         uint256 => Election
     ) private elections;
-
 
     // ============================================================
     // CANDIDATE STORAGE
@@ -189,7 +177,6 @@ contract CollegeVoting {
             bytes32 => bool
         )
     ) private candidateIdentityExists;
-
 
     // ============================================================
     // VOTER STORAGE
@@ -217,9 +204,8 @@ contract CollegeVoting {
         uint256 => bytes32[]
     ) private electionVoterIdentities;
 
-
     // ============================================================
-    // PHASE 6 - SECURITY STORAGE
+    // SECURITY STORAGE
     // ============================================================
 
     uint256 private nextSecurityIncidentId = 1;
@@ -232,6 +218,17 @@ contract CollegeVoting {
         uint256 => uint256[]
     ) private electionSecurityIncidentIds;
 
+    // ============================================================
+    // PHASE 7 - RESULT STORAGE
+    // ============================================================
+
+    mapping(
+        uint256 => ElectionResult
+    ) private electionResults;
+
+    mapping(
+        uint256 => bool
+    ) private resultFinalized;
 
     // ============================================================
     // ELECTION EVENTS
@@ -285,9 +282,8 @@ contract CollegeVoting {
         uint256 indexed electionId
     );
 
-
     // ============================================================
-    // PHASE 5 - ADMIN EVENTS
+    // ADMIN EVENTS
     // ============================================================
 
     event AdminAdded(
@@ -298,9 +294,8 @@ contract CollegeVoting {
         address indexed admin
     );
 
-
     // ============================================================
-    // PHASE 6 - SECURITY EVENT
+    // SECURITY EVENTS
     // ============================================================
 
     event SecurityIncidentReported(
@@ -312,7 +307,6 @@ contract CollegeVoting {
         bytes32 evidenceHash,
         address indexed reportedBy
     );
-
 
     // ============================================================
     // CANDIDATE EVENTS
@@ -341,7 +335,6 @@ contract CollegeVoting {
         uint256 indexed candidateId
     );
 
-
     // ============================================================
     // VOTER EVENTS
     // ============================================================
@@ -356,7 +349,6 @@ contract CollegeVoting {
         bytes32 indexed identityHash
     );
 
-
     // ============================================================
     // VOTING EVENT
     // ============================================================
@@ -367,9 +359,25 @@ contract CollegeVoting {
         uint256 indexed candidateId
     );
 
+    // ============================================================
+    // PHASE 7 - RESULT EVENT
+    // ============================================================
+
+    event ElectionResultFinalized(
+        uint256 indexed electionId,
+        uint256 totalVotes,
+        uint256 eligibleVoters,
+        uint256 turnoutBasisPoints,
+        uint256 winnerCandidateId,
+        uint256 winningVoteCount,
+        bool isTie,
+        bool hasVotes,
+        bytes32 resultHash,
+        address indexed finalizedBy
+    );
 
     // ============================================================
-    // PHASE 5 - ADD ADMIN
+    // ADMIN MANAGEMENT
     // ============================================================
 
     function addAdmin(
@@ -394,16 +402,10 @@ contract CollegeVoting {
         );
 
         electionAdmins[admin] = true;
-
         adminList.push(admin);
 
         emit AdminAdded(admin);
     }
-
-
-    // ============================================================
-    // PHASE 5 - REMOVE ADMIN
-    // ============================================================
 
     function removeAdmin(
         address admin
@@ -439,11 +441,6 @@ contract CollegeVoting {
         emit AdminRemoved(admin);
     }
 
-
-    // ============================================================
-    // PHASE 5 - CHECK ADMIN
-    // ============================================================
-
     function isAdmin(
         address account
     )
@@ -457,11 +454,6 @@ contract CollegeVoting {
         );
     }
 
-
-    // ============================================================
-    // PHASE 5 - GET ADMIN COUNT
-    // ============================================================
-
     function getAdminCount()
         external
         view
@@ -469,11 +461,6 @@ contract CollegeVoting {
     {
         return adminList.length;
     }
-
-
-    // ============================================================
-    // PHASE 5 - GET ADMIN BY INDEX
-    // ============================================================
 
     function getAdminAt(
         uint256 index
@@ -489,7 +476,6 @@ contract CollegeVoting {
 
         return adminList[index];
     }
-
 
     // ============================================================
     // CREATE ELECTION
@@ -551,7 +537,6 @@ contract CollegeVoting {
         return electionId;
     }
 
-
     // ============================================================
     // SCHEDULE ELECTION
     // ============================================================
@@ -583,7 +568,6 @@ contract CollegeVoting {
             electionId
         );
     }
-
 
     // ============================================================
     // START ELECTION
@@ -629,7 +613,6 @@ contract CollegeVoting {
         );
     }
 
-
     // ============================================================
     // PAUSE ELECTION
     // ============================================================
@@ -661,7 +644,6 @@ contract CollegeVoting {
             electionId
         );
     }
-
 
     // ============================================================
     // RESUME ELECTION
@@ -700,7 +682,6 @@ contract CollegeVoting {
             electionId
         );
     }
-
 
     // ============================================================
     // END ELECTION
@@ -742,9 +723,71 @@ contract CollegeVoting {
         );
     }
 
+    // ============================================================
+    // PHASE 7 - INTERNAL RESULT HASH
+    // ============================================================
+
+    function _calculateResultHash(
+        uint256 electionId,
+        uint256 totalVotes,
+        uint256 eligibleVoters,
+        uint256 turnoutBasisPoints,
+        uint256 winnerCandidateId,
+        uint256 winningVoteCount,
+        bool isTie,
+        bool hasVotes
+    )
+        internal
+        view
+        returns (bytes32)
+    {
+        uint256 candidateCount =
+            electionCandidateIds[
+                electionId
+            ].length;
+
+        uint256[] memory candidateIds =
+            new uint256[](candidateCount);
+
+        uint256[] memory candidateVotes =
+            new uint256[](candidateCount);
+
+        for (
+            uint256 i = 0;
+            i < candidateCount;
+            i++
+        ) {
+            uint256 candidateId =
+                electionCandidateIds[
+                    electionId
+                ][i];
+
+            candidateIds[i] = candidateId;
+
+            candidateVotes[i] =
+                candidates[
+                    electionId
+                ][candidateId].voteCount;
+        }
+
+        return keccak256(
+            abi.encode(
+                electionId,
+                totalVotes,
+                eligibleVoters,
+                turnoutBasisPoints,
+                winnerCandidateId,
+                winningVoteCount,
+                isTie,
+                hasVotes,
+                candidateIds,
+                candidateVotes
+            )
+        );
+    }
 
     // ============================================================
-    // FINALIZE ELECTION
+    // FINALIZE ELECTION + CALCULATE RESULT
     // ============================================================
 
     function finalizeElection(
@@ -767,14 +810,193 @@ contract CollegeVoting {
             "Election not ended"
         );
 
+        uint256 totalVotes =
+            election.totalVotes;
+
+        uint256 eligibleVoters =
+            election.eligibleVoterCount;
+
+        // --------------------------------------------------------
+        // Check votes cannot exceed eligible voters
+        // --------------------------------------------------------
+
+        require(
+            totalVotes <= eligibleVoters,
+            "Vote count exceeds eligible voters"
+        );
+
+        // --------------------------------------------------------
+        // Reconstruct candidate totals
+        // --------------------------------------------------------
+
+        uint256 candidateVoteSum = 0;
+
+        uint256 winnerCandidateId = 0;
+
+        uint256 winningVoteCount = 0;
+
+        uint256 candidatesWithMaximumVotes = 0;
+
+        uint256 candidateCount =
+            electionCandidateIds[
+                electionId
+            ].length;
+
+        for (
+            uint256 i = 0;
+            i < candidateCount;
+            i++
+        ) {
+            uint256 candidateId =
+                electionCandidateIds[
+                    electionId
+                ][i];
+
+            Candidate storage candidate =
+                candidates[
+                    electionId
+                ][candidateId];
+
+            candidateVoteSum +=
+                candidate.voteCount;
+
+            if (
+                candidate.voteCount >
+                winningVoteCount
+            ) {
+                winningVoteCount =
+                    candidate.voteCount;
+
+                winnerCandidateId =
+                    candidateId;
+
+                candidatesWithMaximumVotes = 1;
+            }
+            else if (
+                candidate.voteCount ==
+                winningVoteCount &&
+                candidate.voteCount > 0
+            ) {
+                candidatesWithMaximumVotes++;
+            }
+        }
+
+        // --------------------------------------------------------
+        // Cross-check candidate totals
+        // --------------------------------------------------------
+
+        require(
+            candidateVoteSum ==
+            totalVotes,
+            "Vote count mismatch"
+        );
+
+        // --------------------------------------------------------
+        // Determine result state
+        // --------------------------------------------------------
+
+        bool hasVotes =
+            totalVotes > 0;
+
+        bool isTie = false;
+
+        if (
+            hasVotes &&
+            candidatesWithMaximumVotes > 1
+        ) {
+            isTie = true;
+            winnerCandidateId = 0;
+        }
+
+        if (!hasVotes) {
+            winnerCandidateId = 0;
+            winningVoteCount = 0;
+            isTie = false;
+        }
+
+        // --------------------------------------------------------
+        // Calculate turnout
+        //
+        // 10000 = 100%
+        // 7500  = 75%
+        // 5000  = 50%
+        // --------------------------------------------------------
+
+        uint256 turnoutBasisPoints = 0;
+
+        if (eligibleVoters > 0) {
+            turnoutBasisPoints =
+                (
+                    totalVotes * 10000
+                ) /
+                eligibleVoters;
+        }
+
+        // --------------------------------------------------------
+        // Generate deterministic result hash
+        // --------------------------------------------------------
+
+        bytes32 resultHash =
+            _calculateResultHash(
+                electionId,
+                totalVotes,
+                eligibleVoters,
+                turnoutBasisPoints,
+                winnerCandidateId,
+                winningVoteCount,
+                isTie,
+                hasVotes
+            );
+
+        // --------------------------------------------------------
+        // Store result
+        // --------------------------------------------------------
+
+        electionResults[electionId] =
+            ElectionResult({
+                electionId: electionId,
+                totalVotes: totalVotes,
+                eligibleVoters: eligibleVoters,
+                turnoutBasisPoints:
+                    turnoutBasisPoints,
+                winnerCandidateId:
+                    winnerCandidateId,
+                winningVoteCount:
+                    winningVoteCount,
+                isTie: isTie,
+                hasVotes: hasVotes,
+                resultHash: resultHash,
+                finalizedAt: block.timestamp,
+                finalizedBy: msg.sender
+            });
+
+        resultFinalized[electionId] =
+            true;
+
+        // --------------------------------------------------------
+        // Move election to FINALIZING
+        // --------------------------------------------------------
+
         election.status =
             ElectionStatus.FINALIZING;
 
         emit ElectionFinalizing(
             electionId
         );
-    }
 
+        emit ElectionResultFinalized(
+            electionId,
+            totalVotes,
+            eligibleVoters,
+            turnoutBasisPoints,
+            winnerCandidateId,
+            winningVoteCount,
+            isTie,
+            hasVotes,
+            resultHash,
+            msg.sender
+        );
+    }
 
     // ============================================================
     // PUBLISH ELECTION
@@ -800,6 +1022,11 @@ contract CollegeVoting {
             "Election not finalizing"
         );
 
+        require(
+            resultFinalized[electionId],
+            "Result not finalized"
+        );
+
         election.status =
             ElectionStatus.PUBLISHED;
 
@@ -807,7 +1034,6 @@ contract CollegeVoting {
             electionId
         );
     }
-
 
     // ============================================================
     // CANCEL ELECTION
@@ -841,7 +1067,6 @@ contract CollegeVoting {
         );
     }
 
-
     // ============================================================
     // COMPROMISE ELECTION
     // ============================================================
@@ -874,7 +1099,6 @@ contract CollegeVoting {
         );
     }
 
-
     // ============================================================
     // INVALIDATE ELECTION
     // ============================================================
@@ -906,7 +1130,6 @@ contract CollegeVoting {
             electionId
         );
     }
-
 
     // ============================================================
     // PHASE 6 - REPORT SECURITY INCIDENT
@@ -972,9 +1195,8 @@ contract CollegeVoting {
         return incidentId;
     }
 
-
     // ============================================================
-    // PHASE 6 - GET SECURITY INCIDENT
+    // GET SECURITY INCIDENT
     // ============================================================
 
     function getSecurityIncident(
@@ -994,11 +1216,6 @@ contract CollegeVoting {
         ];
     }
 
-
-    // ============================================================
-    // PHASE 6 - GET INCIDENT COUNT
-    // ============================================================
-
     function getSecurityIncidentCount()
         external
         view
@@ -1006,11 +1223,6 @@ contract CollegeVoting {
     {
         return nextSecurityIncidentId - 1;
     }
-
-
-    // ============================================================
-    // PHASE 6 - GET ELECTION INCIDENT COUNT
-    // ============================================================
 
     function getElectionSecurityIncidentCount(
         uint256 electionId
@@ -1029,11 +1241,6 @@ contract CollegeVoting {
         ].length;
     }
 
-
-    // ============================================================
-    // PHASE 6 - GET ELECTION INCIDENT ID
-    // ============================================================
-
     function getElectionSecurityIncidentId(
         uint256 electionId,
         uint256 index
@@ -1049,9 +1256,9 @@ contract CollegeVoting {
 
         require(
             index <
-                electionSecurityIncidentIds[
-                    electionId
-                ].length,
+            electionSecurityIncidentIds[
+                electionId
+            ].length,
             "Incident index out of bounds"
         );
 
@@ -1059,7 +1266,6 @@ contract CollegeVoting {
             electionId
         ][index];
     }
-
 
     // ============================================================
     // ADD CANDIDATE
@@ -1138,7 +1344,6 @@ contract CollegeVoting {
         return candidateId;
     }
 
-
     // ============================================================
     // UPDATE CANDIDATE
     // ============================================================
@@ -1193,7 +1398,6 @@ contract CollegeVoting {
         );
     }
 
-
     // ============================================================
     // REMOVE CANDIDATE
     // ============================================================
@@ -1246,7 +1450,6 @@ contract CollegeVoting {
         );
     }
 
-
     // ============================================================
     // WITHDRAW CANDIDATE
     // ============================================================
@@ -1298,7 +1501,6 @@ contract CollegeVoting {
             candidateId
         );
     }
-
 
     // ============================================================
     // REGISTER VOTER
@@ -1359,7 +1561,6 @@ contract CollegeVoting {
         );
     }
 
-
     // ============================================================
     // REVOKE VOTER ELIGIBILITY
     // ============================================================
@@ -1413,7 +1614,6 @@ contract CollegeVoting {
         );
     }
 
-
     // ============================================================
     // CHECK VOTER ELIGIBILITY
     // ============================================================
@@ -1435,7 +1635,6 @@ contract CollegeVoting {
             electionId
         ][identityHash];
     }
-
 
     // ============================================================
     // CHECK WHETHER VOTER HAS VOTED
@@ -1459,7 +1658,6 @@ contract CollegeVoting {
         ][identityHash];
     }
 
-
     // ============================================================
     // GET REGISTERED VOTER COUNT
     // ============================================================
@@ -1481,12 +1679,10 @@ contract CollegeVoting {
         ].length;
     }
 
-
     // ============================================================
     // CAST VOTE
     // ============================================================
-
-    // Kept owner-only in Phase 6.
+    // Kept owner-only in Phase 6/7.
     // Actual voter wallet authorization comes later.
 
     function castVote(
@@ -1568,6 +1764,139 @@ contract CollegeVoting {
         );
     }
 
+    // ============================================================
+    // PHASE 7 - GET ELECTION RESULT
+    // ============================================================
+
+    function getElectionResult(
+        uint256 electionId
+    )
+        external
+        view
+        returns (ElectionResult memory)
+    {
+        require(
+            elections[electionId].id != 0,
+            "Election does not exist"
+        );
+
+        require(
+            resultFinalized[electionId],
+            "Result not finalized"
+        );
+
+        return electionResults[
+            electionId
+        ];
+    }
+
+    // ============================================================
+    // PHASE 7 - CHECK RESULT EXISTS
+    // ============================================================
+
+    function hasElectionResult(
+        uint256 electionId
+    )
+        external
+        view
+        returns (bool)
+    {
+        return resultFinalized[
+            electionId
+        ];
+    }
+
+    // ============================================================
+    // PHASE 7 - VERIFY RESULT
+    // ============================================================
+
+    function verifyElectionResult(
+        uint256 electionId
+    )
+        external
+        view
+        returns (bool)
+    {
+        require(
+            elections[electionId].id != 0,
+            "Election does not exist"
+        );
+
+        require(
+            resultFinalized[electionId],
+            "Result not finalized"
+        );
+
+        Election storage election =
+            elections[electionId];
+
+        ElectionResult storage result =
+            electionResults[electionId];
+
+        // Check stored election total
+        if (
+            election.totalVotes !=
+            result.totalVotes
+        ) {
+            return false;
+        }
+
+        // Check stored eligible count
+        if (
+            election.eligibleVoterCount !=
+            result.eligibleVoters
+        ) {
+            return false;
+        }
+
+        // Reconstruct candidate totals
+        uint256 candidateVoteSum = 0;
+
+        uint256 candidateCount =
+            electionCandidateIds[
+                electionId
+            ].length;
+
+        for (
+            uint256 i = 0;
+            i < candidateCount;
+            i++
+        ) {
+            uint256 candidateId =
+                electionCandidateIds[
+                    electionId
+                ][i];
+
+            candidateVoteSum +=
+                candidates[
+                    electionId
+                ][candidateId].voteCount;
+        }
+
+        if (
+            candidateVoteSum !=
+            result.totalVotes
+        ) {
+            return false;
+        }
+
+        bytes32 recalculatedHash =
+            _calculateResultHash(
+                result.electionId,
+                result.totalVotes,
+                result.eligibleVoters,
+                result.turnoutBasisPoints,
+                result.winnerCandidateId,
+                result.winningVoteCount,
+                result.isTie,
+                result.hasVotes
+            );
+
+        return (
+            recalculatedHash ==
+            result.resultHash
+        );
+    }
 
     // ============================================================
     // GET ELECTION
@@ -1591,7 +1920,6 @@ contract CollegeVoting {
         ];
     }
 
-
     // ============================================================
     // GET NEXT ELECTION ID
     // ============================================================
@@ -1603,7 +1931,6 @@ contract CollegeVoting {
     {
         return nextElectionId;
     }
-
 
     // ============================================================
     // GET CANDIDATE
@@ -1634,7 +1961,6 @@ contract CollegeVoting {
         ][candidateId];
     }
 
-
     // ============================================================
     // GET ALL CANDIDATE IDS
     // ============================================================
@@ -1655,7 +1981,6 @@ contract CollegeVoting {
             electionId
         ];
     }
-
 
     // ============================================================
     // GET CANDIDATE COUNT
